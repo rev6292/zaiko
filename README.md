@@ -1,20 +1,61 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# 在庫管理システム
 
-# Run and deploy your AI Studio app
+在庫管理システム20250809
 
-This contains everything you need to run your app locally.
+## 概要
 
-View your app in AI Studio: https://ai.studio/apps/drive/1qfgFqhAT11RIX37-yCl-tDgosBBMZRlF
+このプロジェクトは、サロンや小売店向けの包括的な在庫管理システムです。
 
-## Run Locally
+## 機能
 
-**Prerequisites:**  Node.js
+- 商品の入庫・出庫管理
+- 在庫状況のリアルタイム監視
+- 発注管理
+- レポート生成
+- ユーザー権限管理
+- AI支援機能（Gemini API）
 
+## 技術スタック
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+- **フロントエンド**: React + TypeScript + Vite
+- **バックエンド**: Firebase Functions + TypeScript
+- **データベース**: Firestore
+- **認証**: Firebase Authentication
+- **AI**: Google Gemini API
+
+## セットアップ
+
+### 前提条件
+- Node.js (v18以上)
+- npm または yarn
+
+### インストール
+
+1. 依存関係をインストール:
+   ```bash
+   npm install
+   ```
+
+2. 環境変数を設定:
+   - `env.example`を参考に`.env.local`ファイルを作成
+   - `GEMINI_API_KEY`を設定
+
+3. 開発サーバーを起動:
+   ```bash
+   npm run dev
+   ```
+
+## ビルド
+
+本番用ビルド:
+```bash
+npm run build
+```
+
+## デプロイ
+
+Vercelへのデプロイ手順は`VERCEL_DEPLOY.md`を参照してください。
+
+## ライセンス
+
+このプロジェクトはMITライセンスの下で公開されています。
