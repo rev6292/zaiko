@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, ReactNode, useCallback } from 'react';
 import { PurchaseListItem, PurchaseOrder, PurchaseOrderItem, ProductWithStock } from '../types'; 
-import apiClient from '../services/apiClient';
+import { apiClient } from '../services/apiClient';
 
 interface PurchaseListContextType {
   purchaseListItems: PurchaseListItem[];
@@ -63,7 +63,8 @@ export const PurchaseListProvider: React.FC<{ children: ReactNode }> = ({ childr
         orderDate: new Date().toISOString().split('T')[0], supplierId, createdById, items: orderItems, storeId,
     };
 
-    const newOrder = await apiClient.post('/purchase-orders', orderPayload);
+    const result = await apiClient.purchaseOrders.create(orderPayload);
+    const newOrder = result.data as PurchaseOrder;
     setPurchaseListItems(prevItems => prevItems.filter(item => !(item.supplierId === supplierId && item.addedAt === date)));
     return newOrder;
   }, [purchaseListItems]);
@@ -91,8 +92,8 @@ export const PurchaseListProvider: React.FC<{ children: ReactNode }> = ({ childr
         const orderPayload: Omit<PurchaseOrder, 'id'|'status'|'supplierName'> = {
             orderDate: new Date().toISOString().split('T')[0], supplierId, createdById, items: orderItems, storeId
         };
-        const newOrder = await apiClient.post('/purchase-orders', orderPayload);
-        createdOrders.push(newOrder);
+        const result = await apiClient.purchaseOrders.create(orderPayload);
+        createdOrders.push(result.data as PurchaseOrder);
     }
     
     setPurchaseListItems(prev => prev.filter(item => item.addedAt !== date));

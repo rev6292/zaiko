@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, ReactNode } from 'react';
 import { Store, UserRole } from '../types';
-import apiClient from '../services/apiClient';
+import { apiClient } from '../services/apiClient';
 import { useAuth } from './AuthContext';
 import { useLocation } from 'react-router-dom';
 
@@ -36,7 +36,8 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       setLoading(true);
       setError(null);
       try {
-        const fetchedStores = await apiClient.get('/stores');
+        const result = await apiClient.stores.getAll();
+        const fetchedStores = result.data as Store[];
         setStores(fetchedStores);
       } catch (err) {
         setError('店舗情報の読み込みに失敗しました。');

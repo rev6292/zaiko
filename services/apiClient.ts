@@ -1,166 +1,304 @@
-import { initializeApp } from 'firebase/app';
-import { getFunctions, httpsCallable } from 'firebase/functions';
-import { firebaseConfig } from '../src/firebaseConfig';
-
-// Firebase初期化
-const app = initializeApp(firebaseConfig);
-const functions = getFunctions(app);
-
-// 環境に応じてエミュレーターを使用
-if (process.env.NODE_ENV === 'development') {
-  // ローカル開発時はFirebaseエミュレーターを使用
-  // connectFunctionsEmulator(functions, 'localhost', 5001);
-}
+import { httpsCallable } from 'firebase/functions';
+import { functions } from '../src/firebaseConfig';
 
 // APIクライアントの基本設定
 export const apiClient = {
   // 認証関連
-  auth: {
-    login: (id: string, password: string) => 
-      httpsCallable(functions, 'authenticateUser')({ id, password }),
-    
-    updatePassword: (id: string, currentPassword: string, newPassword: string) =>
-      httpsCallable(functions, 'updateAdminPassword')({ id, currentPassword, newPassword })
+  authenticateUser: (email: string, password: string) => {
+    const authenticateUserFunction = httpsCallable(functions, 'authenticateUser');
+    return authenticateUserFunction({ email, password });
   },
 
-  // カテゴリ管理
-  categories: {
-    getAll: () => httpsCallable(functions, 'getCategories')(),
-    create: (category: any) => httpsCallable(functions, 'addCategory')(category),
-    update: (category: any) => httpsCallable(functions, 'updateCategory')(category),
-    delete: (id: string) => httpsCallable(functions, 'deleteCategory')({ id })
+  // カテゴリ関連
+  getCategories: () => {
+    const getCategoriesFunction = httpsCallable(functions, 'getCategories');
+    return getCategoriesFunction();
   },
 
-  // 商品管理
-  products: {
-    getAll: (storeId?: string) => httpsCallable(functions, 'getProducts')({ storeId }),
-    getAujuaProducts: (storeId?: string) => httpsCallable(functions, 'getAujuaProducts')({ storeId }),
-    getById: (id: string, storeId?: string) => httpsCallable(functions, 'getProductById')({ id, storeId }),
-    findByBarcode: (barcode: string, storeId?: string, aujuaOnly?: boolean) => 
-      httpsCallable(functions, 'findProductByBarcode')({ barcode, storeId, aujuaOnly }),
-    create: (productData: any, stockData: any, operatorId: string) => 
-      httpsCallable(functions, 'addProduct')({ productData, stockData, operatorId }),
-    update: (product: any, stock: any, storeId: string) => 
-      httpsCallable(functions, 'updateProductAndInventory')({ product, stock, storeId }),
-    updateStock: (productId: string, storeId: string, newStock: number) => 
-      httpsCallable(functions, 'updateSingleStock')({ productId, storeId, newStock }),
-    delete: (id: string) => httpsCallable(functions, 'deleteProduct')({ id }),
-    batchUpsert: (productsData: any[], storeId: string) => 
-      httpsCallable(functions, 'batchUpsertProducts')({ productsData, storeId })
+  addCategory: (category: any) => {
+    const addCategoryFunction = httpsCallable(functions, 'addCategory');
+    return addCategoryFunction(category);
   },
 
-  // 仕入先管理
-  suppliers: {
-    getAll: () => httpsCallable(functions, 'getSuppliers')(),
-    create: (supplier: any) => httpsCallable(functions, 'addSupplier')(supplier),
-    update: (supplier: any) => httpsCallable(functions, 'updateSupplier')(supplier),
-    delete: (id: string) => httpsCallable(functions, 'deleteSupplier')({ id })
+  updateCategory: (id: string, category: any) => {
+    const updateCategoryFunction = httpsCallable(functions, 'updateCategory');
+    return updateCategoryFunction({ id, ...category });
   },
 
-  // 店舗管理
-  stores: {
-    getAll: () => httpsCallable(functions, 'getStores')(),
-    create: (store: any) => httpsCallable(functions, 'addStore')(store),
-    update: (store: any) => httpsCallable(functions, 'updateStore')(store),
-    delete: (id: string) => httpsCallable(functions, 'deleteStore')({ id })
+  deleteCategory: (id: string) => {
+    const deleteCategoryFunction = httpsCallable(functions, 'deleteCategory');
+    return deleteCategoryFunction({ id });
   },
 
-  // ユーザー管理
-  users: {
-    getAll: () => httpsCallable(functions, 'getStaffUsers')(),
-    create: (userData: any) => httpsCallable(functions, 'addStaffUser')(userData),
-    update: (userData: any) => httpsCallable(functions, 'updateStaffUser')(userData),
-    delete: (id: string) => httpsCallable(functions, 'deleteStaffUser')({ id })
+  // 商品関連
+  getProducts: () => {
+    const getProductsFunction = httpsCallable(functions, 'getProducts');
+    return getProductsFunction();
   },
 
-  // 会社情報
-  company: {
-    get: () => httpsCallable(functions, 'getCompanyInfo')(),
-    update: (info: any) => httpsCallable(functions, 'updateCompanyInfo')(info)
+  getAujuaProducts: () => {
+    const getAujuaProductsFunction = httpsCallable(functions, 'getAujuaProducts');
+    return getAujuaProductsFunction();
   },
 
-  // 入庫管理
-  intake: {
-    getScheduled: (storeId?: string) => httpsCallable(functions, 'getScheduledIntakeItems')({ storeId }),
-    addFromInvoice: (items: any[], supplierId: string, userId: string, storeId: string) => 
-      httpsCallable(functions, 'addReceivedItemsFromInvoice')({ items, supplierId, userId, storeId }),
-    addAujuaFromInvoice: (items: any[], supplierId: string, userId: string, storeId: string) => 
-      httpsCallable(functions, 'addAujuaReceivedItemsFromInvoice')({ items, supplierId, userId, storeId }),
-    addNewProducts: (items: any[], supplierId: string, registrarId: string, storeId: string) => 
-      httpsCallable(functions, 'addNewProductsFromAIData')({ items, supplierId, registrarId, storeId }),
-    update: (item: any) => httpsCallable(functions, 'updateScheduledIntakeItem')(item),
-    processBatch: (items: any[], supplierId: string, operatorId: string, storeId: string, aujuaOnly?: boolean) => 
-      httpsCallable(functions, 'processIntakeBatch')({ items, supplierId, operatorId, storeId, aujuaOnly })
+  getProductById: (id: string) => {
+    const getProductByIdFunction = httpsCallable(functions, 'getProductById');
+    return getProductByIdFunction({ id });
   },
 
-  // 出庫管理
-  outbound: {
-    processBatch: (items: any[], operatorId: string, storeId: string, aujuaOnly?: boolean) => 
-      httpsCallable(functions, 'processOutboundBatch')({ items, operatorId, storeId, aujuaOnly })
+  findProductByBarcode: (barcode: string) => {
+    const findProductByBarcodeFunction = httpsCallable(functions, 'findProductByBarcode');
+    return findProductByBarcodeFunction({ barcode });
   },
 
-  // 発注管理
-  purchaseOrders: {
-    getAll: (storeId?: string) => httpsCallable(functions, 'getPurchaseOrders')({ storeId }),
-    getById: (id: string) => httpsCallable(functions, 'getPurchaseOrderById')({ id }),
-    create: (orderData: any) => httpsCallable(functions, 'addPurchaseOrder')(orderData),
-    processReceipt: (orderId: string, receivedItems: any[], userId: string) => 
-      httpsCallable(functions, 'processPurchaseOrderReceipt')({ orderId, receivedItems, userId })
+  addProduct: (product: any) => {
+    const addProductFunction = httpsCallable(functions, 'addProduct');
+    return addProductFunction(product);
   },
 
-  // ダッシュボード
-  dashboard: {
-    getAdmin: (startDate: string, endDate: string, periodLabel: string, storeId?: string) => 
-      httpsCallable(functions, 'getAdminDashboardData')({ startDate, endDate, periodLabel, storeId }),
-    getStaff: (storeId: string) => httpsCallable(functions, 'getStaffDashboardData')({ storeId }),
-    getAujua: (month: string, storeId: string) => httpsCallable(functions, 'getAujuaDashboardData')({ month, storeId }),
-    getAujuaHistory: (storeId: string) => httpsCallable(functions, 'getAujuaUnifiedHistory')({ storeId }),
-    getCategoryAnalysis: (parentCategoryId?: string, childCategoryId?: string, storeId?: string) => 
-      httpsCallable(functions, 'getCategoryAnalysisData')({ parentCategoryId, childCategoryId, storeId })
+  updateProductAndInventory: (id: string, product: any) => {
+    const updateProductAndInventoryFunction = httpsCallable(functions, 'updateProductAndInventory');
+    return updateProductAndInventoryFunction({ id, ...product });
   },
 
-  // レポート
-  reports: {
-    getMonthlyPurchase: (month: string, storeId?: string) => 
-      httpsCallable(functions, 'getMonthlyPurchaseReport')({ month, storeId })
+  updateSingleStock: (id: string, stock: any) => {
+    const updateSingleStockFunction = httpsCallable(functions, 'updateSingleStock');
+    return updateSingleStockFunction({ id, ...stock });
   },
 
-  // データ管理
-  data: {
-    export: () => httpsCallable(functions, 'exportAllData')(),
-    import: (data: any) => httpsCallable(functions, 'importAllData')(data),
-    runAutoBackup: () => httpsCallable(functions, 'runAutoBackupCheck')(),
-    getAutoBackups: () => httpsCallable(functions, 'getAutoBackups')(),
-    restoreFromBackup: (timestamp: string) => httpsCallable(functions, 'restoreFromAutoBackup')({ timestamp })
+  deleteProduct: (id: string) => {
+    const deleteProductFunction = httpsCallable(functions, 'deleteProduct');
+    return deleteProductFunction({ id });
   },
 
-  // ログ
-  logs: {
-    add: (action: string, userId: string) => httpsCallable(functions, 'addChangeLog')({ action, userId })
+  batchUpsertProducts: (products: any[]) => {
+    const batchUpsertProductsFunction = httpsCallable(functions, 'batchUpsertProducts');
+    return batchUpsertProductsFunction({ products });
+  },
+
+  // サプライヤー関連
+  getSuppliers: () => {
+    const getSuppliersFunction = httpsCallable(functions, 'getSuppliers');
+    return getSuppliersFunction();
+  },
+
+  addSupplier: (supplier: any) => {
+    const addSupplierFunction = httpsCallable(functions, 'addSupplier');
+    return addSupplierFunction(supplier);
+  },
+
+  updateSupplier: (id: string, supplier: any) => {
+    const updateSupplierFunction = httpsCallable(functions, 'updateSupplier');
+    return updateSupplierFunction({ id, ...supplier });
+  },
+
+  deleteSupplier: (id: string) => {
+    const deleteSupplierFunction = httpsCallable(functions, 'deleteSupplier');
+    return deleteSupplierFunction({ id });
+  },
+
+  // 店舗関連
+  getStores: () => {
+    const getStoresFunction = httpsCallable(functions, 'getStores');
+    return getStoresFunction();
+  },
+
+  addStore: (store: any) => {
+    const addStoreFunction = httpsCallable(functions, 'addStore');
+    return addStoreFunction(store);
+  },
+
+  updateStore: (id: string, store: any) => {
+    const updateStoreFunction = httpsCallable(functions, 'updateStore');
+    return updateStoreFunction({ id, ...store });
+  },
+
+  deleteStore: (id: string) => {
+    const deleteStoreFunction = httpsCallable(functions, 'deleteStore');
+    return deleteStoreFunction({ id });
+  },
+
+  // ユーザー関連
+  getUsers: () => {
+    const getUsersFunction = httpsCallable(functions, 'getUsers');
+    return getUsersFunction();
+  },
+
+  addUser: (user: any) => {
+    const addUserFunction = httpsCallable(functions, 'addUser');
+    return addUserFunction(user);
+  },
+
+  updateUser: (id: string, user: any) => {
+    const updateUserFunction = httpsCallable(functions, 'updateUser');
+    return updateUserFunction({ id, ...user });
+  },
+
+  deleteUser: (id: string) => {
+    const deleteUserFunction = httpsCallable(functions, 'deleteUser');
+    return deleteUserFunction({ id });
+  },
+
+  // 会社情報関連
+  getCompanyInfo: () => {
+    const getCompanyInfoFunction = httpsCallable(functions, 'getCompanyInfo');
+    return getCompanyInfoFunction();
+  },
+
+  updateCompanyInfo: (companyInfo: any) => {
+    const updateCompanyInfoFunction = httpsCallable(functions, 'updateCompanyInfo');
+    return updateCompanyInfoFunction(companyInfo);
+  },
+
+  // 入荷関連
+  getIntakeItems: () => {
+    const getIntakeItemsFunction = httpsCallable(functions, 'getIntakeItems');
+    return getIntakeItemsFunction();
+  },
+
+  addIntakeItem: (item: any) => {
+    const addIntakeItemFunction = httpsCallable(functions, 'addIntakeItem');
+    return addIntakeItemFunction(item);
+  },
+
+  updateIntakeItem: (id: string, item: any) => {
+    const updateIntakeItemFunction = httpsCallable(functions, 'updateIntakeItem');
+    return updateIntakeItemFunction({ id, ...item });
+  },
+
+  deleteIntakeItem: (id: string) => {
+    const deleteIntakeItemFunction = httpsCallable(functions, 'deleteIntakeItem');
+    return deleteIntakeItemFunction({ id });
+  },
+
+  // 出荷関連
+  getOutboundItems: () => {
+    const getOutboundItemsFunction = httpsCallable(functions, 'getOutboundItems');
+    return getOutboundItemsFunction();
+  },
+
+  addOutboundItem: (item: any) => {
+    const addOutboundItemFunction = httpsCallable(functions, 'addOutboundItem');
+    return addOutboundItemFunction(item);
+  },
+
+  updateOutboundItem: (id: string, item: any) => {
+    const updateOutboundItemFunction = httpsCallable(functions, 'updateOutboundItem');
+    return updateOutboundItemFunction({ id, ...item });
+  },
+
+  deleteOutboundItem: (id: string) => {
+    const deleteOutboundItemFunction = httpsCallable(functions, 'deleteOutboundItem');
+    return deleteOutboundItemFunction({ id });
+  },
+
+  // 発注関連
+  getPurchaseOrders: () => {
+    const getPurchaseOrdersFunction = httpsCallable(functions, 'getPurchaseOrders');
+    return getPurchaseOrdersFunction();
+  },
+
+  addPurchaseOrder: (order: any) => {
+    const addPurchaseOrderFunction = httpsCallable(functions, 'addPurchaseOrder');
+    return addPurchaseOrderFunction(order);
+  },
+
+  updatePurchaseOrder: (id: string, order: any) => {
+    const updatePurchaseOrderFunction = httpsCallable(functions, 'updatePurchaseOrder');
+    return updatePurchaseOrderFunction({ id, ...order });
+  },
+
+  deletePurchaseOrder: (id: string) => {
+    const deletePurchaseOrderFunction = httpsCallable(functions, 'deletePurchaseOrder');
+    return deletePurchaseOrderFunction({ id });
+  },
+
+  // ダッシュボード関連
+  getDashboardData: () => {
+    const getDashboardDataFunction = httpsCallable(functions, 'getDashboardData');
+    return getDashboardDataFunction();
+  },
+
+  getInventorySummary: () => {
+    const getInventorySummaryFunction = httpsCallable(functions, 'getInventorySummary');
+    return getInventorySummaryFunction();
+  },
+
+  getSalesData: () => {
+    const getSalesDataFunction = httpsCallable(functions, 'getSalesData');
+    return getSalesDataFunction();
+  },
+
+  getLowStockAlerts: () => {
+    const getLowStockAlertsFunction = httpsCallable(functions, 'getLowStockAlerts');
+    return getLowStockAlertsFunction();
+  },
+
+  // レポート関連
+  generateReport: (reportType: string, filters: any) => {
+    const generateReportFunction = httpsCallable(functions, 'generateReport');
+    return generateReportFunction({ reportType, filters });
+  },
+
+  exportReport: (reportType: string, format: string, filters: any) => {
+    const exportReportFunction = httpsCallable(functions, 'exportReport');
+    return exportReportFunction({ reportType, format, filters });
+  },
+
+  // データ管理関連
+  backupData: () => {
+    const backupDataFunction = httpsCallable(functions, 'backupData');
+    return backupDataFunction();
+  },
+
+  restoreData: (backupData: any) => {
+    const restoreDataFunction = httpsCallable(functions, 'restoreData');
+    return restoreDataFunction({ backupData });
+  },
+
+  clearData: () => {
+    const clearDataFunction = httpsCallable(functions, 'clearData');
+    return clearDataFunction();
+  },
+
+  // ログ関連
+  getLogs: () => {
+    const getLogsFunction = httpsCallable(functions, 'getLogs');
+    return getLogsFunction();
+  },
+
+  addLog: (log: any) => {
+    const addLogFunction = httpsCallable(functions, 'addLog');
+    return addLogFunction(log);
+  },
+
+  clearLogs: () => {
+    const clearLogsFunction = httpsCallable(functions, 'clearLogs');
+    return clearLogsFunction();
   }
 };
 
 // エラーハンドリング用のヘルパー関数
 export const handleApiError = (error: any) => {
   console.error('API Error:', error);
-  
+
   if (error.code === 'functions/unavailable') {
     throw new Error('サービスが一時的に利用できません。しばらく待ってから再試行してください。');
   }
-  
+
   if (error.code === 'functions/permission-denied') {
     throw new Error('この操作を実行する権限がありません。');
   }
-  
+
   if (error.code === 'functions/unauthenticated') {
     throw new Error('認証が必要です。再度ログインしてください。');
   }
-  
+
   // カスタムエラーメッセージがある場合はそれを使用
   if (error.message) {
     throw new Error(error.message);
   }
-  
+
   throw new Error('予期しないエラーが発生しました。');
 };
 

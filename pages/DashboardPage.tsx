@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { UserRole, AdminDashboardData, StaffDashboardData, ProductWithStock, CategoryPerformance, ProductUsage, SupplierUsagePerformance, Category, CategoryAnalysisData, RankedProduct, TableHeader } from '../types';
-import apiClient from '../services/apiClient';
+import { apiClient } from '../services/apiClient';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { UI_TEXT, ROUTE_PATHS } from '../constants';
 import { ArrowDownTrayIcon, ArrowUpTrayIcon, FireIcon, ExclamationTriangleIcon, ChartBarIcon, ArchiveBoxIcon, BellAlertIcon, CurrencyYenIcon, ArchiveBoxXMarkIcon, ArrowPathIcon, BanknotesIcon, InformationCircleIcon, TruckIcon, FolderIcon } from '@heroicons/react/24/outline';
@@ -111,14 +111,14 @@ const CategoryAnalysisSection: React.FC = () => {
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
-        apiClient.get('/categories').then(setCategories).catch(() => setError('カテゴリの読み込みに失敗しました。'));
+        apiClient.categories.getAll().then(result => setCategories(result.data as Category[])).catch(() => setError('カテゴリの読み込みに失敗しました。'));
     }, []);
 
     useEffect(() => {
         setLoading(true);
         setError(null);
-        apiClient.get('/dashboard/category-analysis', { parentCategoryId, childCategoryId, storeId: selectedStoreId })
-            .then(data => setAnalysisData(data))
+        apiClient.dashboard.getCategoryAnalysis({ parentCategoryId, childCategoryId, storeId: selectedStoreId })
+            .then(result => setAnalysisData(result.data as CategoryAnalysisData))
             .catch(() => setError('カテゴリ分析データの読み込みに失敗しました。'))
             .finally(() => setLoading(false));
     }, [parentCategoryId, childCategoryId, selectedStoreId]);
@@ -225,13 +225,14 @@ const DashboardPage: React.FC = () => {
           const endDate = new Date(year, month, 0).toISOString().split('T')[0];
           const periodLabel = `${year}-${String(month).padStart(2, '0')}`;
           
-          const data = await apiClient.get('/dashboard/admin', { startDate, endDate, periodLabel, storeId: selectedStoreId });
-          setAdminData(data);
+          const result = await apiClient.dashboard.getAdmin({ startDate, endDate, periodLabel, storeId: selectedStoreId });
+          setAdminData(result.data as AdminDashboardData);
         } else if (currentUser.role === UserRole.STAFF) {
-          const data = await apiClient.get('/dashboard/staff', { storeId: selectedStoreId });
-          setStaffData(data);
+          const result = await apiClient.dashboard.getStaff({ storeId: selectedStoreId });
+          setStaffData(result.data as StaffDashboardData);
         }
-        const products: ProductWithStock[] = await apiClient.get('/products', { storeId: selectedStoreId });
+        const productsResult = await apiClient.products.getAll({ storeId: selectedStoreId });
+        const products = productsResult.data as ProductWithStock[];
         setLowStockProducts(products.filter(p => p.currentStock < p.minimumStock));
       } catch (err) {
         setError(UI_TEXT.ERROR_LOADING_DATA);

@@ -1,7 +1,6 @@
-
 import React, { useState, useEffect } from 'react';
 import { PurchaseOrder, Supplier, CompanyInfo } from '../types';
-import apiClient from '../services/apiClient';
+import { apiClient } from '../services/apiClient';
 import Modal from './Modal';
 import LoadingSpinner from './LoadingSpinner';
 import { APP_TITLE } from '../constants';
@@ -28,14 +27,17 @@ const PurchaseOrderPreviewModal: React.FC<PurchaseOrderPreviewModalProps> = ({ o
             }
             setLoading(true);
             try {
-                 const orderData = await apiClient.get(`/purchase-orders/${orderId}`);
+                 const orderResult = await apiClient.purchaseOrders.getById(orderId);
+                 const orderData = orderResult.data as PurchaseOrder;
 
                 if (orderData) {
                     setOrder(orderData);
-                    const [allSuppliers, companyData] = await Promise.all([
-                        apiClient.get('/suppliers'),
-                        apiClient.get('/company-info'),
+                    const [allSuppliersResult, companyResult] = await Promise.all([
+                        apiClient.suppliers.getAll(),
+                        apiClient.company.get(),
                     ]);
+                    const allSuppliers = allSuppliersResult.data as Supplier[];
+                    const companyData = companyResult.data as CompanyInfo;
                     const supplierData = allSuppliers.find((s: Supplier) => s.id === orderData.supplierId);
                     setSupplierInfo(supplierData || null);
                     setCompanyInfo(companyData);
