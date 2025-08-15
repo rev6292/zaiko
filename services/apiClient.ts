@@ -1,114 +1,171 @@
-import * as geminiApi from './gemini';
+import { initializeApp } from 'firebase/app';
+import { getFunctions, httpsCallable } from 'firebase/functions';
+import { firebaseConfig } from '../src/firebaseConfig';
 
-const baseUrl = 'http://localhost:5001/salon-stock-app/us-central1/api';
+// Firebase初期化
+const app = initializeApp(firebaseConfig);
+const functions = getFunctions(app);
 
-const apiClient = {
-  async get(path: string, params?: any): Promise<any> {
-    const url = new URL(`${baseUrl}${path}`);
-    if (params) {
-      Object.keys(params).forEach(key => url.searchParams.append(key, params[key]));
-    }
+// 環境に応じてエミュレーターを使用
+if (process.env.NODE_ENV === 'development') {
+  // ローカル開発時はFirebaseエミュレーターを使用
+  // connectFunctionsEmulator(functions, 'localhost', 5001);
+}
 
-    const response = await fetch(url.toString());
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    return response.json();
-
-    /*
-    const poMatch = path.match(/^\/purchase-orders\/(.+)$/);
-    if (poMatch) {
-      return api.getPurchaseOrderById(poMatch[1]);
-    }
+// APIクライアントの基本設定
+export const apiClient = {
+  // 認証関連
+  auth: {
+    login: (id: string, password: string) => 
+      httpsCallable(functions, 'authenticateUser')({ id, password }),
     
-    const productMatch = path.match(/^\/products\/(.+)$/);
-    if (productMatch) {
-      return api.getProductById(productMatch[1], params?.storeId);
-    }
-
-    switch (path) {
-      case '/products':
-        if (params?.barcode) return api.findProductByBarcode(params.barcode, params?.storeId);
-        return api.getProducts(params?.storeId);
-      case '/products/auju':
-        if (params?.barcode) {
-          console.log(`%c[API Client Debug] Calling findProductByBarcode for Aujua. Barcode: \"${params.barcode}\", Store ID: \"${params.storeId}\"`, 'color: #f59e0b; font-weight: bold;');
-          return api.findProductByBarcode(params.barcode, params?.storeId, true);
-        }
-        return api.getAujuaProducts(params?.storeId);
-      case '/suppliers':
-        return api.getSuppliers();
-      case '/stores':
-        return api.getStores();
-      case '/categories':
-        return api.getCategories();
-      case '/intake-items':
-        return api.getScheduledIntakeItems(params?.storeId);
-      case '/dashboard/admin':
-        return api.getAdminDashboardData(params.startDate, params.endDate, params.periodLabel, params.storeId);
-      case '/dashboard/staff':
-        return api.getStaffDashboardData(params?.storeId);
-      case '/dashboard/auju':
-        return api.getAujuaDashboardData(params.month, params?.storeId);
-      case '/dashboard/category-analysis':
-        return api.getCategoryAnalysisData(params.parentCategoryId, params.childCategoryId, params.storeId);
-      case '/history/auju':
-        return api.getAujuaUnifiedHistory(params?.storeId);
-      case '/reports/monthly-purchase':
-        return api.getMonthlyPurchaseReport(params.month, params?.storeId);
-      case '/users/staff':
-        return api.getStaffUsers();
-      case '/company-info':
-        return api.getCompanyInfo();
-      case '/purchase-orders':
-        return api.getPurchaseOrders(params?.storeId);
-      case '/data/export-all':
-        return api.exportAllData();
-      case '/data/auto-backups':
-        return api.getAutoBackups();
-      default:
-        throw new Error(`GET path not found: ${path}`);
-    }
-    */
+    updatePassword: (id: string, currentPassword: string, newPassword: string) =>
+      httpsCallable(functions, 'updateAdminPassword')({ id, currentPassword, newPassword })
   },
 
-  async post(path: string, data?: any): Promise<any> {
-    const response = await fetch(`${baseUrl}${path}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(data),
-    });
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    return response.json();
+  // カテゴリ管理
+  categories: {
+    getAll: () => httpsCallable(functions, 'getCategories')(),
+    create: (category: any) => httpsCallable(functions, 'addCategory')(category),
+    update: (category: any) => httpsCallable(functions, 'updateCategory')(category),
+    delete: (id: string) => httpsCallable(functions, 'deleteCategory')({ id })
   },
 
-  async put(path: string, data: any): Promise<any> {
-    const response = await fetch(`${baseUrl}${path}`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(data),
-    });
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    return response.json();
+  // 商品管理
+  products: {
+    getAll: (storeId?: string) => httpsCallable(functions, 'getProducts')({ storeId }),
+    getAujuaProducts: (storeId?: string) => httpsCallable(functions, 'getAujuaProducts')({ storeId }),
+    getById: (id: string, storeId?: string) => httpsCallable(functions, 'getProductById')({ id, storeId }),
+    findByBarcode: (barcode: string, storeId?: string, aujuaOnly?: boolean) => 
+      httpsCallable(functions, 'findProductByBarcode')({ barcode, storeId, aujuaOnly }),
+    create: (productData: any, stockData: any, operatorId: string) => 
+      httpsCallable(functions, 'addProduct')({ productData, stockData, operatorId }),
+    update: (product: any, stock: any, storeId: string) => 
+      httpsCallable(functions, 'updateProductAndInventory')({ product, stock, storeId }),
+    updateStock: (productId: string, storeId: string, newStock: number) => 
+      httpsCallable(functions, 'updateSingleStock')({ productId, storeId, newStock }),
+    delete: (id: string) => httpsCallable(functions, 'deleteProduct')({ id }),
+    batchUpsert: (productsData: any[], storeId: string) => 
+      httpsCallable(functions, 'batchUpsertProducts')({ productsData, storeId })
   },
 
-  async delete(path: string): Promise<any> {
-    const response = await fetch(`${baseUrl}${path}`, {
-      method: 'DELETE',
-    });
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    return response.json();
+  // 仕入先管理
+  suppliers: {
+    getAll: () => httpsCallable(functions, 'getSuppliers')(),
+    create: (supplier: any) => httpsCallable(functions, 'addSupplier')(supplier),
+    update: (supplier: any) => httpsCallable(functions, 'updateSupplier')(supplier),
+    delete: (id: string) => httpsCallable(functions, 'deleteSupplier')({ id })
   },
+
+  // 店舗管理
+  stores: {
+    getAll: () => httpsCallable(functions, 'getStores')(),
+    create: (store: any) => httpsCallable(functions, 'addStore')(store),
+    update: (store: any) => httpsCallable(functions, 'updateStore')(store),
+    delete: (id: string) => httpsCallable(functions, 'deleteStore')({ id })
+  },
+
+  // ユーザー管理
+  users: {
+    getAll: () => httpsCallable(functions, 'getStaffUsers')(),
+    create: (userData: any) => httpsCallable(functions, 'addStaffUser')(userData),
+    update: (userData: any) => httpsCallable(functions, 'updateStaffUser')(userData),
+    delete: (id: string) => httpsCallable(functions, 'deleteStaffUser')({ id })
+  },
+
+  // 会社情報
+  company: {
+    get: () => httpsCallable(functions, 'getCompanyInfo')(),
+    update: (info: any) => httpsCallable(functions, 'updateCompanyInfo')(info)
+  },
+
+  // 入庫管理
+  intake: {
+    getScheduled: (storeId?: string) => httpsCallable(functions, 'getScheduledIntakeItems')({ storeId }),
+    addFromInvoice: (items: any[], supplierId: string, userId: string, storeId: string) => 
+      httpsCallable(functions, 'addReceivedItemsFromInvoice')({ items, supplierId, userId, storeId }),
+    addAujuaFromInvoice: (items: any[], supplierId: string, userId: string, storeId: string) => 
+      httpsCallable(functions, 'addAujuaReceivedItemsFromInvoice')({ items, supplierId, userId, storeId }),
+    addNewProducts: (items: any[], supplierId: string, registrarId: string, storeId: string) => 
+      httpsCallable(functions, 'addNewProductsFromAIData')({ items, supplierId, registrarId, storeId }),
+    update: (item: any) => httpsCallable(functions, 'updateScheduledIntakeItem')(item),
+    processBatch: (items: any[], supplierId: string, operatorId: string, storeId: string, aujuaOnly?: boolean) => 
+      httpsCallable(functions, 'processIntakeBatch')({ items, supplierId, operatorId, storeId, aujuaOnly })
+  },
+
+  // 出庫管理
+  outbound: {
+    processBatch: (items: any[], operatorId: string, storeId: string, aujuaOnly?: boolean) => 
+      httpsCallable(functions, 'processOutboundBatch')({ items, operatorId, storeId, aujuaOnly })
+  },
+
+  // 発注管理
+  purchaseOrders: {
+    getAll: (storeId?: string) => httpsCallable(functions, 'getPurchaseOrders')({ storeId }),
+    getById: (id: string) => httpsCallable(functions, 'getPurchaseOrderById')({ id }),
+    create: (orderData: any) => httpsCallable(functions, 'addPurchaseOrder')(orderData),
+    processReceipt: (orderId: string, receivedItems: any[], userId: string) => 
+      httpsCallable(functions, 'processPurchaseOrderReceipt')({ orderId, receivedItems, userId })
+  },
+
+  // ダッシュボード
+  dashboard: {
+    getAdmin: (startDate: string, endDate: string, periodLabel: string, storeId?: string) => 
+      httpsCallable(functions, 'getAdminDashboardData')({ startDate, endDate, periodLabel, storeId }),
+    getStaff: (storeId: string) => httpsCallable(functions, 'getStaffDashboardData')({ storeId }),
+    getAujua: (month: string, storeId: string) => httpsCallable(functions, 'getAujuaDashboardData')({ month, storeId }),
+    getAujuaHistory: (storeId: string) => httpsCallable(functions, 'getAujuaUnifiedHistory')({ storeId }),
+    getCategoryAnalysis: (parentCategoryId?: string, childCategoryId?: string, storeId?: string) => 
+      httpsCallable(functions, 'getCategoryAnalysisData')({ parentCategoryId, childCategoryId, storeId })
+  },
+
+  // レポート
+  reports: {
+    getMonthlyPurchase: (month: string, storeId?: string) => 
+      httpsCallable(functions, 'getMonthlyPurchaseReport')({ month, storeId })
+  },
+
+  // データ管理
+  data: {
+    export: () => httpsCallable(functions, 'exportAllData')(),
+    import: (data: any) => httpsCallable(functions, 'importAllData')(data),
+    runAutoBackup: () => httpsCallable(functions, 'runAutoBackupCheck')(),
+    getAutoBackups: () => httpsCallable(functions, 'getAutoBackups')(),
+    restoreFromBackup: (timestamp: string) => httpsCallable(functions, 'restoreFromAutoBackup')({ timestamp })
+  },
+
+  // ログ
+  logs: {
+    add: (action: string, userId: string) => httpsCallable(functions, 'addChangeLog')({ action, userId })
+  }
 };
 
-export default apiClient;
+// エラーハンドリング用のヘルパー関数
+export const handleApiError = (error: any) => {
+  console.error('API Error:', error);
+  
+  if (error.code === 'functions/unavailable') {
+    throw new Error('サービスが一時的に利用できません。しばらく待ってから再試行してください。');
+  }
+  
+  if (error.code === 'functions/permission-denied') {
+    throw new Error('この操作を実行する権限がありません。');
+  }
+  
+  if (error.code === 'functions/unauthenticated') {
+    throw new Error('認証が必要です。再度ログインしてください。');
+  }
+  
+  // カスタムエラーメッセージがある場合はそれを使用
+  if (error.message) {
+    throw new Error(error.message);
+  }
+  
+  throw new Error('予期しないエラーが発生しました。');
+};
+
+// APIレスポンスの型定義
+export interface ApiResponse<T = any> {
+  data: T;
+  error?: string;
+}

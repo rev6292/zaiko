@@ -1,5 +1,8 @@
-import { Product, Supplier, ScheduledIntakeItem, ScheduledIntakeStatus, UserRole, AdminDashboardData, StaffDashboardData, MonthlyReportDataPoint, Category, User, SupplierMonthlyPerformance, ProcessedInvoiceItem, PurchaseOrder, PurchaseOrderStatus, PurchaseOrderItem, CompanyInfo, WatchlistItem, InventoryMovement, CategoryPerformance, Store, InventoryRecord, ProductWithStock, MonthlyOutboundItem, AllDataBackup, AutoBackup, AutoBackupInfo, UnifiedHistoryItem, AujuaDashboardData, AujuaInventoryCategoryGroup, ProductUsage, NewProductLog, AujuaProductHistoryGroup, SupplierUsagePerformance, CategoryAnalysisData, RankedProduct } from '../types';
-import { AUJUA_ROOT_CATEGORY_ID } from '../constants';
+// 新しいAPIクライアントを使用
+import { apiClient, handleApiError } from './apiClient';
+
+// 既存のAPI関数を新しいクライアントでラップ
+// これにより、既存のコードを変更することなくFirebaseバックエンドと連携できます
 
 // localStorage Helper Functions
 const lsGet = <T,>(key: string, fallback: T): T => {
@@ -314,122 +317,87 @@ export const restoreFromAutoBackup = async (timestamp: string): Promise<{ succes
 
 
 // Auth
-export const authenticateUser = (id: string, password?: string): Promise<User> => {
-  return new Promise((resolve, reject) => {
-    setTimeout(() => {
-      const users = dataManager.get('users');
-      const user = users.find(u => u.id === id);
-      const mockHashedPassword = `${password}_hashed_mock`;
-      if (user && user.hashedPassword && user.hashedPassword === mockHashedPassword) {
-        const { hashedPassword, ...userWithoutPassword } = user;
-        resolve(userWithoutPassword);
-      } else {
-        reject(new Error("ユーザーIDまたはパスワードが正しくありません。"));
-      }
-    }, 500);
-  });
+export const authenticateUser = async (id: string, password?: string): Promise<any> => {
+  try {
+    const result = await apiClient.auth.login(id, password || '');
+    return result.data;
+  } catch (error) {
+    throw handleApiError(error);
+  }
 };
 
 // Categories (Persistent)
-let aujuaTopLevelCategoryCache = new Map<string, Category | null>();
-const invalidateAujuaCaches = () => {
-    aujuaCategoryIds = null;
-    aujuaTopLevelCategoryCache.clear();
+export const getCategories = async (): Promise<any[]> => {
+  try {
+    const result = await apiClient.categories.getAll();
+    return result.data;
+  } catch (error) {
+    throw handleApiError(error);
+  }
 };
-export const getCategories = (): Promise<Category[]> => simulateApiCall(dataManager.get('categories'));
-export const addCategory = (category: Omit<Category, 'id'>): Promise<Category> => {
-  const newCategory: Category = { ...category, id: `cat${Date.now()}` };
-  const categories = dataManager.get('categories');
-  dataManager.set('categories', [...categories, newCategory]);
-  invalidateAujuaCaches();
-  return simulateApiCall(newCategory);
+
+export const addCategory = async (category: any): Promise<any> => {
+  try {
+    const result = await apiClient.categories.create(category);
+    return result.data;
+  } catch (error) {
+    throw handleApiError(error);
+  }
 };
-export const updateCategory = (updatedCategory: Category): Promise<Category> => {
-  const categories = dataManager.get('categories');
-  dataManager.set('categories', categories.map(c => c.id === updatedCategory.id ? updatedCategory : c));
-  invalidateAujuaCaches();
-  return simulateApiCall(updatedCategory);
+
+export const updateCategory = async (updatedCategory: any): Promise<any> => {
+  try {
+    const result = await apiClient.categories.update(updatedCategory);
+    return result.data;
+  } catch (error) {
+    throw handleApiError(error);
+  }
 };
-export const deleteCategory = (categoryId: string): Promise<{ success: boolean }> => {
-  const categories = dataManager.get('categories');
-  const products = dataManager.get('products');
-  const isParent = categories.some(c => c.parentId === categoryId);
-  if (isParent) return Promise.reject(new Error("このカテゴリは他のカテゴリの親として使用されているため削除できません。"));
-  const isInUseByProduct = products.some(p => p.categoryId === categoryId);
-  if (isInUseByProduct) return Promise.reject(new Error("このカテゴリは商品に紐付けられているため削除できません。"));
-  dataManager.set('categories', categories.filter(c => c.id !== categoryId));
-  invalidateAujuaCaches();
-  return simulateApiCall({ success: true });
+
+export const deleteCategory = async (categoryId: string): Promise<{ success: boolean }> => {
+  try {
+    const result = await apiClient.categories.delete(categoryId);
+    return result.data;
+  } catch (error) {
+    throw handleApiError(error);
+  }
 };
 
 // Products (Now Persistent)
-const getProductWithStock = (product: Product, storeId?: string): ProductWithStock => {
-    const inventoryRecords = dataManager.get('inventoryRecords');
-    let currentStock = 0, minimumStock = 0;
-    if (storeId && storeId !== 'all') {
-        const record = inventoryRecords.find(inv => inv.productId === product.id && inv.storeId === storeId);
-        if (record) { currentStock = record.currentStock; minimumStock = record.minimumStock; }
-    } else {
-        const records = inventoryRecords.filter(inv => inv.productId === product.id);
-        currentStock = records.reduce((sum, r) => sum + r.currentStock, 0);
-        minimumStock = records.reduce((sum, r) => sum + r.minimumStock, 0);
-    }
-    return { ...product, currentStock, minimumStock };
-};
-
-export const getProducts = (storeId?: string): Promise<ProductWithStock[]> => {
-    const products = dataManager.get('products');
-    const productsWithStock = products.map(p => getProductWithStock(p, storeId));
-    return simulateApiCall(productsWithStock);
-};
-
-export const getAujuaProducts = (storeId?: string): Promise<ProductWithStock[]> => {
-    const products = dataManager.get('products');
-    const aujuaIds = getAujuaDescendantCategoryIds();
-    const aujuaProducts = products.filter(p => aujuaIds.has(p.categoryId));
-    const productsWithStock = aujuaProducts.map(p => getProductWithStock(p, storeId));
-    return simulateApiCall(productsWithStock);
-};
-
-export const getProductById = (id: string, storeId?: string): Promise<ProductWithStock | undefined> => {
-    const product = dataManager.get('products').find(p => p.id === id);
-    if (!product) return simulateApiCall(undefined);
-    return simulateApiCall(getProductWithStock(product, storeId));
-};
-
-export const findProductByBarcode = (barcode: string, storeId?: string, aujuaOnly: boolean = false): Promise<ProductWithStock | undefined> => {
-  console.log(`%c[Aujua Debug] Barcode search started for: "${barcode}". Aujua-only mode: ${aujuaOnly}`, 'color: blue; font-weight: bold;');
-  
-  const allProducts = dataManager.get('products');
-  const trimmedBarcode = barcode.trim();
-  const product = allProducts.find(p => {
-    if (p.barcode == null) return false;
-    if (typeof p.barcode === 'string') return p.barcode.trim() == trimmedBarcode;
-    return p.barcode == trimmedBarcode;
-  });
-
-  if (!product) {
-    console.error(`%c[Aujua Debug] STEP 1 FAILED: No product found with barcode "${barcode}".`, 'color: red; font-weight: bold;');
-    console.log(`[Aujua Debug] All product data currently in database:`, allProducts);
-    return simulateApiCall(undefined);
+export const getProducts = async (storeId?: string): Promise<any[]> => {
+  try {
+    const result = await apiClient.products.getAll(storeId);
+    return result.data;
+  } catch (error) {
+    throw handleApiError(error);
   }
+};
 
-  console.log(`%c[Aujua Debug] STEP 1 SUCCESS: Found a product in the database.`, 'color: green; font-weight: bold;', product);
-
-  if (aujuaOnly) {
-    console.log(`%c[Aujua Debug] STEP 2: Checking Aujua category because 'aujuaOnly' is true...`, 'color: blue; font-weight: bold;');
-    const aujuaIds = getAujuaDescendantCategoryIds();
-    console.log(`[Aujua Debug] Aujua Category IDs to check against:`, Array.from(aujuaIds));
-    const isAujuaProduct = aujuaIds.has(product.categoryId);
-    if (!isAujuaProduct) {
-      console.error(`%c[Aujua Debug] STEP 2 FAILED: The product's category ID ("${product.categoryId}") is NOT in the list of Aujua categories. The product will be ignored.`, 'color: red; font-weight: bold;');
-      return simulateApiCall(undefined);
-    }
-    console.log(`%c[Aujua Debug] STEP 2 SUCCESS: Product category is valid.`, 'color: green; font-weight: bold;');
+export const getAujuaProducts = async (storeId?: string): Promise<any[]> => {
+  try {
+    const result = await apiClient.products.getAujuaProducts(storeId);
+    return result.data;
+  } catch (error) {
+    throw handleApiError(error);
   }
-  
-  console.log(`%c[Aujua Debug] STEP 3: Fetching stock info and returning final product.`, 'color: blue; font-weight: bold;');
-  return simulateApiCall(getProductWithStock(product, storeId));
+};
+
+export const getProductById = async (id: string, storeId?: string): Promise<any | undefined> => {
+  try {
+    const result = await apiClient.products.getById(id, storeId);
+    return result.data;
+  } catch (error) {
+    throw handleApiError(error);
+  }
+};
+
+export const findProductByBarcode = async (barcode: string, storeId?: string, aujuaOnly: boolean = false): Promise<any | undefined> => {
+  try {
+    const result = await apiClient.products.findByBarcode(barcode, storeId, aujuaOnly);
+    return result.data;
+  } catch (error) {
+    throw handleApiError(error);
+  }
 };
 
 export const findProductByName = (name: string): Promise<Product | undefined> => {
